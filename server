@@ -1,0 +1,62 @@
+#!/usr/bin/env ruby
+require 'bundler/inline'
+
+gemfile do
+  source 'https://rubygems.org'
+  gem 'sinatra'
+  gem 'sinatra-contrib'
+  gem 'sequel'
+  gem 'sqlite3'
+end
+
+require 'sinatra/base'
+require 'sinatra/contrib'
+require 'securerandom'
+
+DB = Sequel.sqlite('diary.db')
+$notes = DB[:notes]
+$entries = DB[:entries]
+
+class App < Sinatra::Base
+  get '/entries' do
+    json $entries.all
+  end
+
+  get '/entries/:date' do
+    entry = $entries.first(date: params[:date])
+
+    if entry
+      json entry
+    else
+      status 404
+    end
+  end
+
+  post '/entries' do
+    content = params[:content]
+    date = params[:date]
+    entry = $entries.first(date: params[:date])
+
+    if entry
+      $entries.where(id: entry[:id]).update(content: content)
+    else
+      $entries << { date: date, content: content}
+    end
+
+    status 200
+  end
+
+  get '/notes' do
+    json $notes.all
+  end
+
+  post '/notes' do
+    title = params[:title]
+    content = params[:content]
+
+    $notes << { id: SecureRandom.hex(10), title: title, content: content}
+    status 200
+  end
+end
+
+App.run!

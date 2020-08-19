@@ -18,6 +18,8 @@ $notes = DB[:notes]
 $entries = DB[:entries]
 
 class App < Sinatra::Base
+  set :bind, '0.0.0.0'
+  
   get '/entries' do
     json $entries.all
   end

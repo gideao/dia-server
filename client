@@ -1,0 +1,70 @@
+#!/usr/bin/env ruby
+require 'bundler/inline'
+require 'tempfile'
+require 'json'
+
+gemfile do
+  source 'https://rubygems.org'
+  gem 'clamp'
+  gem 'faraday'
+end
+
+API_URL = ENV['DIARY_URL']
+
+unless API_URL
+  puts 'The API endpoint is not defined!'
+  exit(1)
+end
+
+class Entries
+  def self.get_by_date(date)
+    res = Faraday.get("#{API_URL}/entries/#{date.strftime("%Y%m%d")}")
+    return nil if res.status == 404
+    JSON.parse(res.body, symbolize_names: true)
+  end
+
+  def self.save(date, content)
+    resp = Faraday.post("#{API_URL}/entries", content: content, date: date.strftime("%Y%m%d"))
+  end
+
+  def self.delete(date)
+    resp = Faraday.delete("#{API_URL}/entries/#{date.strftime("%Y%m%d")}")
+  end
+end
+
+class OpenCommand < Clamp::Command
+  def execute
+    tmpfile = Tempfile.new()
+    date = Time.now
+    update = false
+    entry = Entries.get_by_date(date)
+
+    if entry
+      IO.binwrite(tmpfile.path, entry[:content])
+    end
+
+    system(ENV["EDITOR"] || 'nano', tmpfile.path)
+
+    content = IO.binread(tmpfile)
+
+    if update
+      Entries.date(date, content)
+    elsif content
+      Entries.save(date, content)      
+    end
+
+    tmpfile.unlink
+  end
+end
+
+class SearchCommand < Clamp::Command
+  def execute
+    puts 'hi2'
+  end
+end
+
+class MainCommand < Clamp::Command
+  subcommand "open", "Initialize the repository", OpenCommand
+end
+
+MainCommand.run
